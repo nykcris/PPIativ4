@@ -1,13 +1,27 @@
 import express from "express";
+import session from 'express-session';
+import cookieParser from 'cookie-parser';
 
 const app = express();
 const porta = 3000;
 const host = "0.0.0.0";
 var listaMusicas = [];
+app.use(session({
+    secret: 'M1nh4Chav3S3cr3t4',
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        secure: false, //utilizada com http e não somente com https
+        httpOnly: true,
+        maxAge: 1000 * 60 * 30 //30 minutos
+    }
+}));
 
+//adicionando o middleware cookieParser
+app.use(cookieParser());
 // Middleware para processar dados de formulários
 app.use(express.urlencoded({ extended: true }));
-
+app.use(express.static('./páginas/públicas'));
 function cadastroMusicaView(req, res) {
   res.send(`
         <html lang="pt-br">
@@ -59,6 +73,11 @@ function cadastraMusica(req, res) {
   const nomeProducao = req.body.produzidoPor;
   const data = req.body.dataDoLancamento;
 
+   //recuperar informações dos cookies enviado pelo navegador
+   const dataHoraUltimoLogin = req.cookies['dataHoraUltimoLogin'];
+   if (!dataHoraUltimoLogin){
+       dataHoraUltimoLogin='';
+   }
   //validar campos
   //caso os dados não estiverem válidos nós deveremos retornar um feedback para o usuário
 
@@ -188,7 +207,11 @@ function cadastraMusica(req, res) {
         </div>
     </form>
 </div>
+  <div>
+        <p><span>Seu último acesso foi realizado em ${dataHoraUltimoLogin}</span></p>
+    </div>
 </body>
+ <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </html>`);
   }
 
@@ -196,6 +219,10 @@ function cadastraMusica(req, res) {
 }
 
 function menuView(req, res) {
+    const dataHoraUltimoLogin = req.cookies['dataHoraUltimoLogin'];
+    if (!dataHoraUltimoLogin){
+        dataHoraUltimoLogin='';
+    }
   res.send(`
         <html>
             <head>
@@ -206,6 +233,8 @@ function menuView(req, res) {
                 <nav class="navbar bg-body-tertiary">
                     <form class="container-fluid justify-content-start" onsubmit="event.preventDefault(); window.location.href='/creditosMusica';">
                         <button class="btn btn-outline-success me-2" type="submit">Cadastrar Música</button>
+                          <a class="nav-link active" aria-current="page" href="/logout">Sair</a>
+                                <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">Seu último acesso foi realizado em ${dataHoraUltimoLogin}</a>
                     </form>
                 </nav>
             </body>
@@ -213,7 +242,64 @@ function menuView(req, res) {
         </html>
     `);
 }
+function autenticarUsuario(req, resp){
+    const usuario = req.body.usuario;
+    const senha   = req.body.senha;
 
+    if (usuario === 'admin' && senha === '123'){
+        //criar uma sessão individualmente para cada usuário que faça o login
+        req.session.usuarioLogado = true;
+        //criar um cookie enviando para o navegador data e hora de acesso do usuário
+        resp.cookie('dataHoraUltimoLogin', new Date().toLocaleString(), {maxAge: 1000 * 60 * 60 * 24 * 30, httpOnly: true});
+        resp.redirect('/');
+    }
+    else{
+        resp.send(`
+                    <html>
+                        <head>
+                         <meta charset="utf-8">
+                         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
+                               integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+                        </head>
+                        <body>
+                            <div class="container w-25"> 
+                                <div class="alert alert-danger" role="alert">
+                                    Usuário ou senha inválidos!
+                                </div>
+                                <div>
+                                    <a href="/login.html" class="btn btn-primary">Tentar novamente</a>
+                                </div>
+                            </div>
+                        </body>
+                        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+                                integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+                                crossorigin="anonymous">
+                        </script>
+                    </html>
+                  `
+        );
+    }
+}
+
+function verificarAutenticacao(req, resp, next){
+    if (req.session.usuarioLogado){
+        next(); //permita acessar os recursos solicitados
+    }
+    else
+    {
+        resp.redirect('/login.html');
+    }
+}
+
+app.get('/login',(req,res)=>{
+    res.redirect('/login.html');
+})
+app.get('/logout', (req, resp) => {
+    req.session.destroy(); //eliminar a sessão.
+    resp.redirect('/login.html');
+});
+app.post('/login',autenticarUsuario)
+app.get('/', verificarAutenticacao, menuView);
 app.get("/", menuView);
 app.post("/creditosMusica", cadastraMusica);
 app.get("/creditosMusica", cadastroMusicaView);
