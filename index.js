@@ -1,4 +1,5 @@
 import express from "express";
+import path from 'path';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 
@@ -21,7 +22,7 @@ app.use(session({
 app.use(cookieParser());
 // Middleware para processar dados de formulários
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('./pages/public'));
+app.use(express.static(path.join(process.cwd(), 'pages/public')));
 function cadastroMusicaView(req, res) {
   res.send(`
         <html lang="pt-br">
