@@ -1,8 +1,9 @@
-import express from "express";
-import session from 'express-session';
-import cookieParser from 'cookie-parser';
 
-const app = express();
+
+const express = require('express');
+const session = require('express-session');
+const app = express;
+app.use(express.urlencoded({extended: true}))
 const porta = 3000;
 const host = "0.0.0.0";
 var listaMusicas = [];
